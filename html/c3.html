@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="/graphs/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-responsive text-center">
+   <div id="chart"></div>
+</div>
+<script src="/graphs/js/d3.v3.min.js"></script>
+<script src="/graphs/js/c3.min.js"></script>
+<script src="/graphs/js/jquery.min.js"></script>
+<script src="/graphs/js/bootstrap.min.js"></script>
+<script>
+var chart = c3.generate({
+    data: {
+        x: 'x',
+        xFormat: '%Y-%m-%d %H:%M:%S',
+        url: '&days=.01',
+        mimeType: 'json',
+        type: 'line'
+    },
+    axis: {
+        x: {
+            type: 'timeseries',
+            tick: {
+                format: '%Y-%m-%d %X'
+            }
+        }
+    }
+});
+</script>
+</body>
+</html>

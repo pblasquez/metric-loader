@@ -1,0 +1,22 @@
+collections:
+    default:
+        system:
+            name: SNMPv2-MIB::sysName.0
+            type: SNMPv2-MIB::sysObjectID.0
+        interface:
+            description: IF-MIB::ifName
+            InOctets: IF-MIB::ifHCInOctets
+            InErrors: IF-MIB::ifInErrors
+            InDiscards: IF-MIB::ifInDiscards
+            InUcastPkts: IF-MIB::ifHCInUcastPkts
+            InMulticastPkts: IF-MIB::ifHCInMulticastPkts
+            InBroadcastPkts: IF-MIB::ifHCInBroadcastPkts
+            OutOctets: IF-MIB::ifHCOutOctets
+            OutErrors: IF-MIB::ifOutErrors
+            OutDiscards: IF-MIB::ifOutDiscards
+            OutUcastPkts: IF-MIB::ifHCOutUcastPkts
+            OutMulticastPkts: IF-MIB::ifHCOutMulticastPkts
+            OutBroadcastPkts: IF-MIB::ifHCOutBroadcastPkts
+hosts:
+    default:
+        collections: [default]

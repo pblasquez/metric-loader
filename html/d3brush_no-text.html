@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="/graphs/css/bootstrap.min.css" rel="stylesheet">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  display: none;
+}
+
+.brush .extent {
+  stroke: #fff;
+  fill-opacity: .125;
+  shape-rendering: crispEdges;
+}
+
+.line {
+  fill: none;
+  stroke: steelblue;
+  stroke-width: 1.5px;
+}
+
+.legend {
+    font-size: 1.3em;
+    font-weight: bold;
+    border: 0.1em solid grey;
+    margin: 0em;
+    padding: 0em;
+}
+
+</style>
+</head>
+<body>
+<script src="/graphs/js/d3.v3.min.js"></script>
+<script src="/graphs/js/jquery.min.js"></script>
+<script src="/graphs/js/bootstrap.min.js"></script>
+<script>
+var margin = {top: 40, right: 220, bottom: 400, left: 80},
+    margin2 = {top: 430, right: 220, bottom: 20, left: 80},
+    width = 960 - margin.left - margin.right,
+    height = 800 - margin.top - margin.bottom,
+    height2 = 600 - margin2.top - margin2.bottom;
+
+var parseDate = d3.time.format("%Y-%m-%d %X").parse;
+
+var x = d3.time.scale().range([0, width]),
+    x2 = d3.time.scale().range([0, width]),
+    y = d3.scale.linear().range([height, 0]),
+    y2 = d3.scale.linear().range([height2, 0]);
+
+var brush = d3.svg.brush()
+    .x(x2)
+    .y(y2)
+    .on("brush", brush);
+
+var color = d3.scale.category20();
+
+var xAxis = d3.svg.axis().scale(x).orient("bottom"),
+    xAxis2 = d3.svg.axis().scale(x2).orient("bottom"),
+    yAxis = d3.svg.axis().scale(y).orient("left");
+
+var line = d3.svg.line()
+    .interpolate("monotone")
+    .x(function(d) { return x(d.date); })
+    .y(function(d) { return y(d.value); });
+
+var line2 = d3.svg.line()
+    .interpolate("monotone")
+    .x(function(d) { return x2(d.date); })
+    .y(function(d) { return y2(d.value); });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .attr("class", "col-lg-8")
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+svg.append("defs").append("clipPath")
+    .attr("id", "clip")
+    .append("rect")
+    .attr("width", width)
+    .attr("height", height);
+
+var focus = svg.append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var context = svg.append("g")
+    .attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+
+d3.json("&days=.5&metric_like=Ethernet2/2", function(error, data) {
+  if (error) { console.warn(error); };
+  var metrics=[];
+  var values=[];
+  var times=[];
+  var m_names=[];
+  var inthash={};
+  var counters=[];
+  var counterhash={};
+  for (var h in data) {
+    count=0;
+    for (var m in data[h]) {
+      var pre_metrics={};
+      pre_metrics['name']=m;
+      pre_metrics['values']=[];
+      m_names.push(m);
+      var fields = m.split(/-/);
+      if(!(fields[0] in inthash)) {
+        inthash[fields[0]]=1;
+      }
+      if(!(fields[1] in counterhash)) {
+        counters.push(fields[1]);
+        counterhash[fields[1]]=1;
+      }
+      data[h][m].forEach(function(d) {
+        d.time = parseDate(d.time);
+        pre_metrics['values'].push({date: d.time, value: d.value});
+        values.push(d.value);
+        times.push(d.time);
+      });
+      metrics.push(pre_metrics);
+      count+=1;
+    }
+  };
+  m_names.sort();
+  counters.sort();
+  legendSpace = width/counters.length;
+  color.domain(m_names);
+  color.domain(counters);
+  var arr_active={};
+  var m_arr_active={};
+  var c_arr_active={};
+  var s_opacity=0.2;
+
+  x.domain(d3.extent(times));
+  y.domain(d3.extent(values));
+
+  x2.domain(x.domain());
+  y2.domain(y.domain());
+
+  focus.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
+
+  focus.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("Bits/sec");
+
+  counters.forEach(function(d,i) {
+    svg.append("text")
+      .attr("x", (legendSpace/2)+i*legendSpace)
+      .attr("y", (margin.top/2)+ 20)
+      .attr("class", "legend")
+      .style("fill", function() {
+        return d.color = color(d); })
+      .on("mouseover", function(){
+        d3.select(this).style("cursor", "pointer");
+      })
+      .on("click", function(){
+        // Determine if current line is visible
+        var active = c_arr_active[d] ? false : true,
+        newOpacity = active ? 1 : 0;
+        oldOpacity = active ? 0 : 1;
+        // Hide or show the elements based on the ID
+        d3.selectAll(".line")
+          .transition().duration(100)
+          .style("opacity", oldOpacity);
+        d3.selectAll(".line-text")
+          .transition().duration(100)
+          .style("opacity", oldOpacity);
+        if(oldOpacity==0) {
+          d3.selectAll(".line-"+d.replace(/\W+/g, ''))
+            .transition().duration(100)
+            .style("opacity", newOpacity);
+          d3.selectAll(".text-"+d.replace(/\W+/g, ''))
+            .transition().duration(100)
+            .style("opacity", newOpacity);
+        };
+        c_arr_active[d] = active;
+      })
+      .text(d);
+   });
+  
+  var metric = focus.selectAll(".metric")
+    .data(metrics)
+    .enter().append("g")
+    .attr("class", "metric");
+
+  metric.append("path")
+      .attr("class", function(d) {
+        var fields = d.name.split(/-/);
+        return 'data line line-'+fields[0].replace(/\W+/g, '')+' line-'+fields[1].replace(/\W+/g, '')+' line-'+d.name.replace(/\W+/g, '');
+      })
+      .attr('clip-path', 'url(#clip)')
+      .attr("d", function(d) { return line(d.values); })
+      .style("opacity", s_opacity)
+      .on("mouseover", function(){
+        d3.select(this).style("cursor", "pointer");
+      })
+      .on("click", function(d){
+        var fields = d.name.split(/-/);
+        // Determine if current line is visible
+        var active = arr_active[d.name] ? false : true,
+        newOpacity = active ? 1 : s_opacity;
+        // Hide or show the elements based on the ID
+        d3.select(".line-"+d.name.replace(/\W+/g, ''))
+          .transition().duration(100)
+          .style("opacity", newOpacity);
+        d3.select(".text-"+d.name.replace(/\W+/g, ''))
+          .transition().duration(100)
+          .style("opacity", newOpacity);
+        d3.select(".span-"+fields[0].replace(/\W+/g, ''))
+          .transition().duration(100)
+          .style("opacity", newOpacity);
+        arr_active[d.name] = active;
+      })
+      .style("stroke", function(d) { return color(d.name); });
+
+  metric.append("text")
+      .datum(function(d) { return {name: d.name, value: d.values[d.values.length - 1]}; })
+      .attr("transform", function(d) {
+        return "translate(" + x(d.value.date) + "," + y(d.value.value) + ") rotate(-35)";
+      })
+      .attr("x", 3)
+      .attr("dy", ".35em")
+      .attr("fill", function(d) { return color(d.name); })
+      .style("opacity", s_opacity)
+      .attr("class", function(d) {
+        var fields = d.name.split(/-/);
+        return 'line-text text-'+fields[0].replace(/\W+/g, '')+' text-'+fields[1].replace(/\W+/g, '')+' text-'+d.name.replace(/\W+/g, '');
+      })
+      .on("mouseover", function(){
+        d3.select(this).style("cursor", "pointer");
+      })
+      .on("click", function(d){
+        var fields = d.name.split(/-/);
+        // Determine if current line is visible
+        var active = arr_active[d.name] ? false : true,
+        newOpacity = active ? 1 : s_opacity;
+        // Hide or show the elements based on the ID
+        d3.select(".line-"+d.name.replace(/\W+/g, ''))
+          .transition().duration(100)
+          .style("opacity", newOpacity);
+        d3.select(".text-"+d.name.replace(/\W+/g, ''))
+          .transition().duration(100)
+          .style("opacity", newOpacity);
+        d3.select(".span-"+fields[0].replace(/\W+/g, ''))
+          .transition().duration(100)
+          .style("opacity", newOpacity);
+        arr_active[d.name] = active;
+      })
+      .text(function(d) { return d.name; });
+
+  context.selectAll('path')
+      .data(metrics)
+    .enter()
+      .append('path')
+      .attr('d', function (d) {
+        return line2(d.values);
+      })
+      .attr('class', function (d) {
+        return "path_" + d.name;
+      })
+      .style("stroke", function (d) {
+      return color(d.name);
+      })
+      .style("fill-opacity", 0);
+  
+  context.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height2 + ")")
+      .call(xAxis2);
+
+  context.append("g")
+      .attr("class", "x brush")
+      .call(brush)
+      .selectAll("rect")
+      .attr("y", -6)
+      .attr("height", height2 + 7);
+});
+function brush() {
+        var extent = brush.extent();
+        var new_data={};
+        x.domain(brush.empty() ? x2.domain() : [ extent[0][0], extent[1][0] ]);
+        y.domain(brush.empty() ? y2.domain() : [ extent[0][1], extent[1][1] ]);
+        focus.selectAll("path.data").attr("d", function (d) { return line(d.values); });
+
+        focus.select(".x.axis").call(xAxis);
+        focus.select(".y.axis").call(yAxis);
+}
+</script>
+</body>
+</html>

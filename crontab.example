@@ -1,0 +1,10 @@
+MIBS=ALL
+ML_DIR=/opt/metric-loader
+
+*/5  *  *  *  * $ML_DIR/run_multiwalk.sh > /dev/null 2>&1
+0  2  *  *  * $ML_DIR/prune_done.py > /dev/null 2>&1
+
+# do rollups at set intervals
+*/30 * * * * $ML_DIR/run_rollup.sh 1800
+0 */2 * * * $ML_DIR/run_rollup.sh 7200
+0 0 * * * $ML_DIR/run_rollup.sh 86400

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="/graphs/css/bootstrap.min.css" rel="stylesheet">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  display: none;
+}
+
+.brush .extent {
+  stroke: #fff;
+  fill-opacity: .125;
+  shape-rendering: crispEdges;
+}
+
+.line {
+  fill: none;
+  stroke: steelblue;
+  stroke-width: 1.5px;
+}
+
+.legend {
+    font-size: 1.3em;
+    font-weight: bold;
+    border: 0.1em solid grey;
+    margin: 0em;
+    padding: 0em;
+}
+
+</style>
+</head>
+<body>
+<script src="/graphs/js/d3.v3.min.js"></script>
+<script src="/graphs/js/jquery.min.js"></script>
+<script src="/graphs/js/bootstrap.min.js"></script>
+<script>
+var margin = {top: 10, right: 180, bottom: 200, left: 80},
+    margin2 = {top: 330, right: 180, bottom: 20, left: 80},
+    width = 960 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom,
+    height2 = 400 - margin.top - margin.bottom;
+
+var parseDate = d3.time.format("%Y-%m-%d %X").parse;
+
+var x = d3.time.scale().range([0, width]),
+    x2 = d3.time.scale().range([0, width]),
+    y = d3.scale.linear().range([height, 0]),
+    y2 = d3.scale.linear().range([height2, 0]);
+
+var brush = d3.svg.brush()
+    .x(x2)
+    .on("brush", brush);
+
+var color = d3.scale.category20();
+
+var xAxis = d3.svg.axis().scale(x).orient("bottom"),
+    xAxis2 = d3.svg.axis().scale(x2).orient("bottom"),
+    yAxis = d3.svg.axis().scale(y).orient("left");
+
+var line = d3.svg.line()
+    .interpolate("basis")
+    .x(function(d) { return x(d.date); })
+    .y(function(d) { return y(d.value); });
+
+var line2 = d3.svg.line()
+    .interpolate("basis")
+    .x(function(d) { return x2(d.date); })
+    .y(function(d) { return y2(d.value); });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .attr("class", "col-lg-8")
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+svg.append("defs").append("clipPath")
+    .attr("id", "clip")
+    .append("rect")
+    .attr("width", width)
+    .attr("height", height);
+
+var focus = svg.append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var context = svg.append("g")
+    .attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+
+d3.json("&days=.1", function(error, data) {
+  if (error) { console.warn(error); };
+  var metrics=[];
+  var values=[];
+  var times=[];
+  var m_names=[];
+  for (var h in data) {
+    count=0;
+    for (var m in data[h]) {
+      var pre_metrics={};
+      pre_metrics['name']=m;
+      pre_metrics['values']=[];
+      m_names.push(m);
+      data[h][m].forEach(function(d) {
+        d.time = parseDate(d.time);
+        pre_metrics['values'].push({date: d.time, value: d.value});
+        values.push(d.value);
+        times.push(d.time);
+      });
+      metrics.push(pre_metrics);
+      count+=1;
+    }
+  };
+  m_names.sort();
+  color.domain(m_names);
+
+  x.domain(d3.extent(times));
+  y.domain(d3.extent(values));
+
+  x2.domain(x.domain());
+  y2.domain(y.domain());
+
+  focus.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
+
+  focus.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("Bits/sec");
+  
+  var metric = focus.selectAll(".metric")
+    .data(metrics)
+    .enter().append("g")
+    .attr("class", "metric");
+
+  metric.append("path")
+      .attr("class", function(d) {
+        return "line path_"+ d.name +" data";
+      })
+      .attr('clip-path', 'url(#clip)')
+      .attr("d", function(d) { return line(d.values); })
+      .style("stroke", function(d) { return color(d.name); });
+
+  metric.append("text")
+      .datum(function(d) { return {name: d.name, value: d.values[d.values.length - 1]}; })
+      .attr("transform", function(d) {
+        return "translate(" + x(d.value.date) + "," + y(d.value.value) + ") rotate(-35)";
+      })
+      .attr("x", 3)
+      .attr("dy", ".35em")
+      .attr("fill", function(d) { return color(d.name); })
+      .attr("class", function(d) {
+        var fields = d.name.split(/-/);
+        return 'line-text text-'+d.name.replace(/\W+/g, '');
+      })
+      .text(function(d) { return d.name; });
+
+  context.selectAll('path')
+      .data(metrics)
+    .enter()
+      .append('path')
+      .attr('d', function (d) {
+        return line2(d.values);
+      })
+      .attr('class', function (d) {
+        return "path_" + d.name;
+      })
+      .style("stroke", function (d) {
+      return color(d.name);
+      })
+      .style("fill-opacity", 0);
+  
+  context.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height2 + ")")
+      .call(xAxis2);
+
+  context.append("g")
+      .attr("class", "x brush")
+      .call(brush)
+      .selectAll("rect")
+      .attr("y", -6)
+      .attr("height", height2 + 7);
+});
+function brush() {
+        x.domain(brush.empty() ? x2.domain() : brush.extent());
+        focus.selectAll("path.data").attr("d", function (d) { return line(d.values); });
+        focus.select(".x.axis").call(xAxis);
+}
+</script>
+</body>
+</html>
